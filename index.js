@@ -93,7 +93,7 @@ client.on('message', async (topic, payload) => {
 const app = express();
 app.use(cors())
 
-app.use('/public', express.static('public'));
+app.use('/', express.static('public'));
 // Connect To DataBase
 mongoose
   .connect(process.env.MONGO_URI, {
