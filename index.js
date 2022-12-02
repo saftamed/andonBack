@@ -92,57 +92,71 @@ const client = mqtt.connect(connectUrl, {
 const topic = '/safta/mqtt'
 client.on('connect', () => {
   console.log('Connected')
-  client.subscribe(["/safta/c2i/mqtt"], () => {
-    console.log(`Subscribe to topic /safta/c2i/mqtt`)
+  client.subscribe(["/safta/c2i/mqtt","/safta/c2i/mqtt/data"], () => {
+    console.log(`Subscribe to topic /safta/c2i/mqtt and subscribe to "/safta/c2i/mqtt/data"`)
   })
-  client.publish(topic, 'safta mqtt test', { qos: 0, retain: false }, (error) => {
-    if (error) {
-      console.error(error)
-    }
-  })
+  // client.publish(topic, 'safta mqtt test', { qos: 0, retain: false }, (error) => {
+  //   if (error) {
+  //     console.error(error)
+  //   }
+  // })
 })
 
 client.on('message', async (topic, payload) => {
-  var b = JSON.parse(payload.toString());
-  // console.log(b)
-  try {
-    const newUser = await Andon.findOne({ name: b.name });
-    console.log(newUser);
-    if (b.rst === 0) {
-      if (newUser) {
-        newUser.data = b;
-        const savedUser = await newUser.save();
-      } else {
-        const newUser2 = new Andon({
-          name: b.name,
-          data: b
-        });
-        const savedUser = await newUser2.save();
-
-      }
-    } else {
-      if (newUser) {
-        const his = new AndonHis({
-          name: newUser.name,
-          data: newUser.data
+  if(topic === "/safta/c2i/mqtt/data"){
+    try {
+      const andons =  await Andon.find();
+      client.publish("/safta/c2i/mqtt/all", andons.toString(), { qos: 0, retain: false }, (error) => {
+          if (error) {
+            console.error(error)
+          }
         })
-
-        const savedHis = await his.save();
-        newUser.data = b;
-        const savedUser = await newUser.save();
-
-      } else {
-        const newUser2 = new Andon({
-          name: b.name,
-          data: b
-        });
-        const savedUser = await newUser2.save();
-      }
-
+    } catch (err) {
+      console.log(err);
     }
-    getInfo(b)
-  } catch (err) {
-    console.log(err);
+  }else{
+    var b = JSON.parse(payload.toString());
+    // console.log(b)
+    try {
+      const newUser = await Andon.findOne({ name: b.name });
+      console.log(newUser);
+      if (b.rst === 0) {
+        if (newUser) {
+          newUser.data = b;
+          const savedUser = await newUser.save();
+        } else {
+          const newUser2 = new Andon({
+            name: b.name,
+            data: b
+          });
+          const savedUser = await newUser2.save();
+  
+        }
+      } else {
+        if (newUser) {
+          const his = new AndonHis({
+            name: newUser.name,
+            data: newUser.data
+          })
+  
+          const savedHis = await his.save();
+          newUser.data = b;
+          const savedUser = await newUser.save();
+  
+        } else {
+          const newUser2 = new Andon({
+            name: b.name,
+            data: b
+          });
+          const savedUser = await newUser2.save();
+        }
+  
+      }
+      getInfo(b)
+    } catch (err) {
+      console.log(err);
+    }
+
   }
 })
 
