@@ -26,9 +26,9 @@ const express = require("express");
 const Andon = require("./models/Andon");
 const AndonHis = require("./models/AndonHis");
 
-async function getUser(type, level,postt) {
+async function getUser(type, level) {
   try {
-    const users = await User2.findOne({ level: level, post: type,p:postt })
+    const users = await User2.findOne({ level: level, post: type })
     // console.log(users);
     return users
   } catch (err) {
@@ -47,41 +47,36 @@ function call(data) {
   //      .then(call => console.log(call.sid)).catch(err => console.log(err));
 }
 async function getInfo(msg) {
-  try {
-    if (msg.AP > 0) {
-      var u = await getUser("3", msg.AP,msg.post);
-      call({
-        type: "Production",
-        ligne: msg.name,
-        tel: u.tel,
-      });
+  if (msg.AP > 0) {
+    var u = await getUser("3", msg.AP);
+    call({
+      type: "Production",
+      ligne: msg.name,
+      tel: u.tel,
+    });
 
-    } else if (msg.AM > 0) {
-      var u = await getUser("2", msg.AM,msg.post);
-      call({
-        type: "Maintenance",
-        ligne: msg.name,
-        tel: u.tel,
-      });
-    } else if (msg.AL > 0) {
-      var u = await getUser("4", msg.AL,msg.post);
-      call({
-        type: "Logistique",
-        ligne: msg.name,
-        tel: u.tel,
-      });
-    } else if (msg.AQ > 0) {
-      var u = await getUser("1", msg.AQ,msg.post);
-      call({
-        type: "Qualite",
-        ligne: msg.name,
-        tel: u.tel,
-      });
-    }
-  } catch (err) {
-    console.log(err);
+  } else if (msg.AM > 0) {
+    var u = await getUser("2", msg.AM);
+    call({
+      type: "Maintenance",
+      ligne: msg.name,
+      tel: u.tel,
+    });
+  } else if (msg.AL > 0) {
+    var u = await getUser("4", msg.AL);
+    call({
+      type: "Logistique",
+      ligne: msg.name,
+      tel: u.tel,
+    });
+  } else if (msg.AQ > 0) {
+    var u = await getUser("1", msg.AQ);
+    call({
+      type: "Qualite",
+      ligne: msg.name,
+      tel: u.tel,
+    });
   }
-
 }
 
 
@@ -97,7 +92,7 @@ const client = mqtt.connect(connectUrl, {
 const topic = '/safta/mqtt'
 client.on('connect', () => {
   console.log('Connected')
-  client.subscribe(["/safta/c2i/mqtt", "/safta/c2i/mqtt/data"], () => {
+  client.subscribe(["/safta/c2i/mqtt","/safta/c2i/mqtt/data"], () => {
     console.log(`Subscribe to topic /safta/c2i/mqtt and subscribe to "/safta/c2i/mqtt/data"`)
   })
   // client.publish(topic, 'safta mqtt test', { qos: 0, retain: false }, (error) => {
@@ -108,22 +103,20 @@ client.on('connect', () => {
 })
 
 client.on('message', async (topic, payload) => {
-  if (topic === "/safta/c2i/mqtt/data") {
-    console.log("msg received data");
+  if(topic === "/safta/c2i/mqtt/data"){
     try {
-      const andons = await Andon.find().select('data -_id');
-      client.publish("/safta/c2i/mqtt/all", JSON.stringify(andons), { qos: 2, retain: false }, (error) => {
-        if (error) {
-          console.error(error)
-        }
-      })
-      console.log("msg sended to all");
+      const andons =  await Andon.find();
+      client.publish("/safta/c2i/mqtt/all", andons.toString(), { qos: 0, retain: false }, (error) => {
+          if (error) {
+            console.error(error)
+          }
+        })
     } catch (err) {
       console.log(err);
     }
-  } else {
+  }else{
     var b = JSON.parse(payload.toString());
-    console.log("msg received mqtt");
+    // console.log(b)
     try {
       const newUser = await Andon.findOne({ name: b.name });
       console.log(newUser);
@@ -137,29 +130,27 @@ client.on('message', async (topic, payload) => {
             data: b
           });
           const savedUser = await newUser2.save();
-
+  
         }
-        console.log("msg rst");
       } else {
         if (newUser) {
           const his = new AndonHis({
             name: newUser.name,
             data: newUser.data
           })
-
+  
           const savedHis = await his.save();
           newUser.data = b;
           const savedUser = await newUser.save();
-
+  
         } else {
           const newUser2 = new Andon({
             name: b.name,
             data: b
           });
           const savedUser = await newUser2.save();
-          console.log("msg saved");
         }
-
+  
       }
       getInfo(b)
     } catch (err) {
