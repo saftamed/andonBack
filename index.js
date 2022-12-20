@@ -1,7 +1,18 @@
 require("dotenv").config();
 
+const say = require('say')
+let serialportgsm = require('serialport-gsm')
 
 const twilio = require('twilio')(process.env.accountSid, process.env.authToken);
+var exec = require('child_process').execFile;
+
+var fun =function(){
+   console.log("run exec");
+   exec('C:\\Users\\safta\\AppData\\Local\\checklist\\app-1.0.0\\CheckList.exe', function(err, data) {  
+        console.log(err)
+        console.log(data.toString());                       
+    });  
+}
 
 let mongoose = require("mongoose");
 const User2 = require("./models/User2");
@@ -26,52 +37,219 @@ const express = require("express");
 const Andon = require("./models/Andon");
 const AndonHis = require("./models/AndonHis");
 
+
+
+var waitingCalls = [];
+
+var isInCall = false;
+
+
+let modem = serialportgsm.Modem()
+let options = {
+    baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    rtscts: false,
+    xon: false,
+    xoff: false,
+    xany: false,
+    autoDeleteOnReceive: true,
+    enableConcatenation: true,
+    incomingCallIndication: true,
+    incomingSMSIndication: true,
+    pin: '',
+    customInitCommand: '',
+    cnmiCommand: 'AT+CNMI=2,1,0,2,1',
+    logger: {
+      debug: function(aa) {
+        // console.log("safta");
+        // console.log(aa);
+        if(aa.includes("NO CARRIER")){
+          endCall()
+        }
+      }
+    }
+}
+var refreshIntervalId = null;
+var connected = false;
+function openGsm(){
+  clearInterval(refreshIntervalId);
+  refreshIntervalId = setInterval(() => {
+    try {
+      serialportgsm.list((err, result) => {
+        console.log(result);
+        if (result.length > 0) {
+          if(!connected){
+            clearInterval(refreshIntervalId);
+            modem.open('COM17', options)
+          }
+        }
+
+      })
+    
+    }catch (e) {
+      console.log("not connected");
+    }
+  }, 1000);
+}
+
+modem.on('close', result => { 
+  console.log("closed") 
+  connected = false;
+  openGsm()
+})
+
+function endCall(){
+  say.stop()
+  isInCall = false
+  console.log("stoped");
+  callNumber()
+}
+
+function call(data){
+  waitingCalls.push(data);
+  if(!isInCall){
+    callNumber()
+  }
+}
+var calll = null;
+function callNumber(){
+  if (waitingCalls.length <= 0) return;
+  calll = waitingCalls.shift();
+  console.log(calll);
+  if (!calll) return;
+  isInCall = true;
+  const commandParser = modem.executeCommand(`ATD${calll.tel};`,res => {
+    if(res?.status === 'success') {
+      console.log("up");
+      calll = null;
+    } else{
+      endCall()
+    }
+
+  })
+
+  commandParser.logic = (dataLine) => {
+    // console.log(dataLine);
+    if(dataLine.includes("OK")){
+      console.log("okkki");
+        var c =say.speak(`Alarme ${calll.type} ligne ${calll.ligne}   Alarme ${calll.type} ligne ${calll.ligne}` , null, 0.7,(err) => {
+          if (err) {
+            return console.error(err)
+          }
+         
+          console.log('Text has been spoken.')
+          modem.hangupCall(res => {
+            console.log("hangupCall");
+            endCall()
+          })
+        })
+
+
+        return {
+          resultData: {
+            status: 'success',
+            request: 'executeCommand',
+            data: { 'result': "hiii" }
+          },
+          returnResult: true
+        }
+
+    }else if(dataLine.includes("BUSY")){
+      console.log("buuuuusyii");
+      endCall()
+    }else if(dataLine.includes("NO CARRIER")){
+      say.stop()
+      endCall()
+    }
+  };
+}
+modem.on('open', data => {
+  // modem.initializeModem(callback[optional])
+  connected = true;
+  isInCall = false;
+  if(calll){
+    waitingCalls.unshift(calll)
+  }
+  setTimeout(() => {
+    callNumber()
+  }, 5000);
+  console.log("Gsm connection successful");
+  // call1()
+  
+})
+
+openGsm()
+
+
 async function getUser(type, level,postt) {
   try {
-    const users = await User2.findOne({ level: level, post: type,p:postt })
-    // console.log(users);
-    return users
+    var ssd = null
+    if(level >= 3){
+       ssd = await User2.findOne({ level: level, post: type })
+    }else{
+       ssd = await User2.findOne({ level: level, post: type,p:postt })
+    }
+    // console.log(ssd);
+    return ssd
   } catch (err) {
-    return err;
+    return null;
   }
 }
 
-function call(data) {
-  console.log(data);
-  //  twilio.calls
-  //      .create({
-  //        twiml:`<Response><Say language="fr" voice="Polly.Joanna" loop="3" rate="20%">Alarme ${data.type} Ligne ${data.ligne} </Say></Response>`,
-  //        to: `+216${data.tel}`,
-  //         from: '+19388883642'
-  //       })
-  //      .then(call => console.log(call.sid)).catch(err => console.log(err));
+// function call() {
+//   console.log(data);
+
+//   //  twilio.calls
+//   //      .create({
+//   //        twiml:`<Response><Say language="fr" voice="Polly.Joanna" loop="3" rate="20%">Alarme ${data.type} Ligne ${data.ligne} </Say></Response>`,
+//   //        to: `+216${data.tel}`,
+//   //         from: '+19388883642'
+//   //       })
+//   //      .then(call => console.log(call.sid)).catch(err => console.log(err));
+// }
+
+
+function diff(msg,old){
+  if(msg.AQ !== old.AQ && msg.AQ > 0) return "AQ"
+  if(msg.AP !== old.AP && msg.AP > 0) return "AP"
+  if(msg.AL !== old.AL && msg.AL > 0) return "AL"
+  if(msg.AM !== old.AM && msg.AM > 0) return "AM"
 }
-async function getInfo(msg) {
+async function getInfo(msg,old) {
+  console.log(msg.AL,old?.AL);
+  // console.log("info");
   try {
-    if (msg.AP > 0) {
+    if (msg.AP !== old?.AP && msg.AP > 0 ) {
       var u = await getUser("3", msg.AP,msg.post);
+      if (!u) return
       call({
         type: "Production",
         ligne: msg.name,
         tel: u.tel,
       });
 
-    } else if (msg.AM > 0) {
+    } else if (msg.AM !== old?.AM && msg.AM > 0) {
       var u = await getUser("2", msg.AM,msg.post);
+      if (!u) return
       call({
         type: "Maintenance",
         ligne: msg.name,
         tel: u.tel,
       });
-    } else if (msg.AL > 0) {
+    } else if (msg.AL !== old?.AL && msg.AL > 0) {
       var u = await getUser("4", msg.AL,msg.post);
+      
+      if (!u) return
       call({
         type: "Logistique",
         ligne: msg.name,
         tel: u.tel,
       });
-    } else if (msg.AQ > 0) {
+    } else if (msg.AQ !== old?.AQ && msg.AQ > 0) {
       var u = await getUser("1", msg.AQ,msg.post);
+      if (!u) return
       call({
         type: "Qualite",
         ligne: msg.name,
@@ -98,6 +276,7 @@ const topic = '/safta/mqtt'
 client.on('connect', () => {
   console.log('Connected')
   client.subscribe(["/safta/c2i/mqtt", "/safta/c2i/mqtt/data"], () => {
+    // fun();
     console.log(`Subscribe to topic /safta/c2i/mqtt and subscribe to "/safta/c2i/mqtt/data"`)
   })
   // client.publish(topic, 'safta mqtt test', { qos: 0, retain: false }, (error) => {
@@ -126,7 +305,8 @@ client.on('message', async (topic, payload) => {
     console.log("msg received mqtt");
     try {
       const newUser = await Andon.findOne({ name: b.name });
-      console.log(newUser);
+      const an = {...newUser?._doc}
+      // console.log(an);
       if (b.rst === 0) {
         if (newUser) {
           newUser.data = b;
@@ -139,8 +319,10 @@ client.on('message', async (topic, payload) => {
           const savedUser = await newUser2.save();
 
         }
-        console.log("msg rst");
+        // console.log(newUser);
+        getInfo(b,an.data)
       } else {
+        console.log("msg rst");
         if (newUser) {
           const his = new AndonHis({
             name: newUser.name,
@@ -161,7 +343,7 @@ client.on('message', async (topic, payload) => {
         }
 
       }
-      getInfo(b)
+      
     } catch (err) {
       console.log(err);
     }

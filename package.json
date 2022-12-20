@@ -19,6 +19,8 @@
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^6.2.10",
     "mqtt": "^4.3.7",
+    "say": "^0.16.0",
+    "serialport-gsm": "^4.0.1",
     "twilio": "^3.83.3",
     "uuid": "^8.3.2"
   }
