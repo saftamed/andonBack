@@ -82,7 +82,7 @@ function openGsm(){
         if (result.length > 0) {
           if(!connected){
             clearInterval(refreshIntervalId);
-            modem.open('COM17', options)
+            modem.open('COM3', options)
           }
         }
 
