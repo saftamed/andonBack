@@ -50,7 +50,7 @@ router.get("/find/:id", async (req, res) => {
 router.get("/", async (req, res) => {
   const query = req.query.new;
   try {
-    const users =  await User.find().limit(5).sort({createdAt: -1})
+    const users =  await User.find().sort({createdAt: -1})
 
     res.status(200).json(users);
   } catch (err) {
@@ -75,7 +75,7 @@ router.post("/",checkLogin, async (req, res) => {
 //GET USER STATS
 router.get("/search/:s", async (req, res) => {  
   try {
-    const savedMachine = await User.find({ name: { $regex: new RegExp(req.params.s, "i") } }).limit(10);  
+    const savedMachine = await User.find({ name: { $regex: new RegExp(req.params.s, "i") } });  
     res.status(200).json(savedMachine);
   } catch (err) {
     res.status(500).json(err);

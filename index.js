@@ -14,6 +14,9 @@ var fun =function(){
     });  
 }
 
+
+
+
 let mongoose = require("mongoose");
 const User2 = require("./models/User2");
 const bodyParser = require('body-parser')
@@ -183,13 +186,14 @@ modem.on('open', data => {
 openGsm()
 
 
-async function getUser(type, level,postt) {
+
+async function getUser(type, level,postt,lType) {
   try {
     var ssd = null
     if(level >= 3){
        ssd = await User2.findOne({ level: level, post: type })
     }else{
-       ssd = await User2.findOne({ level: level, post: type,p:postt })
+       ssd = await User2.findOne({ level: level, post: type,p:postt,lType: lType })
     }
     // console.log(ssd);
     return ssd
@@ -222,7 +226,8 @@ async function getInfo(msg,old) {
   // console.log("info");
   try {
     if (msg.AP !== old?.AP && msg.AP > 0 ) {
-      var u = await getUser("3", msg.AP,msg.post);
+      var ll = msg.name.startsWith("MR")?"1":"2";
+      var u = await getUser("3", msg.AP,msg.post,ll);
       if (!u) return
       call({
         type: "Production",
@@ -231,7 +236,8 @@ async function getInfo(msg,old) {
       });
 
     } else if (msg.AM !== old?.AM && msg.AM > 0) {
-      var u = await getUser("2", msg.AM,msg.post);
+      var ll = msg.name.startsWith("MR")?"1":"2";
+      var u = await getUser("2", msg.AM,msg.post,ll);
       if (!u) return
       call({
         type: "Maintenance",
@@ -239,7 +245,8 @@ async function getInfo(msg,old) {
         tel: u.tel,
       });
     } else if (msg.AL !== old?.AL && msg.AL > 0) {
-      var u = await getUser("4", msg.AL,msg.post);
+      var ll = msg.name.startsWith("MR")?"1":"2";
+      var u = await getUser("4", msg.AL,msg.post,ll);
       
       if (!u) return
       call({
@@ -248,7 +255,8 @@ async function getInfo(msg,old) {
         tel: u.tel,
       });
     } else if (msg.AQ !== old?.AQ && msg.AQ > 0) {
-      var u = await getUser("1", msg.AQ,msg.post);
+      var ll = msg.name.startsWith("MR")?"1":"2";
+      var u = await getUser("1", msg.AQ,msg.post,ll);
       if (!u) return
       call({
         type: "Qualite",
@@ -395,6 +403,10 @@ function getLocalIp() {
     }
   }
 }
+
+getUser("1","1","A","1").then(function(response){
+  console.log(response);
+})
 app.listen(process.env.PORT || 3000, function () {
   console.log(`server Started on ${getLocalIp()} port ${process.env.PORT || 3000} `);
 });

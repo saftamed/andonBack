@@ -6,7 +6,8 @@ const UserSchema = new mongoose.Schema(
     tel: { type: String,require: true },
     level: { type :String, required: true },
     post: { type: String, required: true },
-    p: { type: String,required: true }
+    p: { type: String,required: true },
+    lType: { type: String,default:"1" }
   },
   { timestamps: true }
 );
