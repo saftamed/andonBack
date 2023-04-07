@@ -81,7 +81,7 @@ function openGsm(){
   refreshIntervalId = setInterval(() => {
     try {
       serialportgsm.list((err, result) => {
-        console.log(result);
+        // console.log(result);
         if (result.length > 0) {
           if(!connected){
             clearInterval(refreshIntervalId);
@@ -111,6 +111,7 @@ function endCall(){
 }
 
 function call(data){
+  console.log("try to call ...");
   waitingCalls.push(data);
   if(!isInCall){
     callNumber()
@@ -123,6 +124,11 @@ function callNumber(){
   console.log(calll);
   if (!calll) return;
   isInCall = true;
+  client.publish("/safta/c2i/mqtt/notif",  JSON.stringify(calll), { qos: 2, retain: false }, (error) => {
+    if (error) {
+      console.error(error)
+    }
+  })
   const commandParser = modem.executeCommand(`ATD${calll.tel};`,res => {
     if(res?.status === 'success') {
       console.log("up");
@@ -186,15 +192,30 @@ modem.on('open', data => {
 openGsm()
 
 
-
+//var u = await getUser("5", 1,a,3);
 async function getUser(type, level,postt,lType) {
   try {
+    var h = new Date().getHours();
     var ssd = null
-    if(level >= 3){
-       ssd = await User2.findOne({ level: level, post: type })
+    if(level == 1){
+      // if(h >= 8 && h <= 17){
+      //   ssd = await User2.findOne({ level: "5", post: type,p:postt,lType: lType })
+      // }else{
+        ssd = await User2.findOne({ level: "1", post: type,p:postt,lType: lType })
+      // }
+    }else if(level >= 2){
+      // check time for call
+      if(h >= 8 && h <= 17){
+        ssd = await User2.findOne({ level: level, post: type})
+      }
     }else{
-       ssd = await User2.findOne({ level: level, post: type,p:postt,lType: lType })
+      if(h >= 8 && h <= 17){
+       ssd = await User2.findOne({ level: level, post: type,p:postt,lType: lType})
+      }
     }
+
+   
+  
     // console.log(ssd);
     return ssd
   } catch (err) {
@@ -221,31 +242,39 @@ function diff(msg,old){
   if(msg.AL !== old.AL && msg.AL > 0) return "AL"
   if(msg.AM !== old.AM && msg.AM > 0) return "AM"
 }
+function getChainType(name2){
+  return name2.startsWith("MR")?"1":name2.startsWith("VI")?"3":name2.startsWith("NA")?"4":"2";
+}
 async function getInfo(msg,old) {
-  console.log(msg.AL,old?.AL);
+  // console.log(msg.APU,old?.APU);
   // console.log("info");
   try {
     if (msg.AP !== old?.AP && msg.AP > 0 ) {
-      var ll = msg.name.startsWith("MR")?"1":"2";
+      console.log("Production");
+      var ll = getChainType(msg.name);
       var u = await getUser("3", msg.AP,msg.post,ll);
       if (!u) return
       call({
         type: "Production",
         ligne: msg.name,
         tel: u.tel,
+        name:u.name
       });
 
     } else if (msg.AM !== old?.AM && msg.AM > 0) {
-      var ll = msg.name.startsWith("MR")?"1":"2";
+      console.log("Maintenance");
+      var ll = getChainType(msg.name);
       var u = await getUser("2", msg.AM,msg.post,ll);
       if (!u) return
       call({
         type: "Maintenance",
         ligne: msg.name,
         tel: u.tel,
+        name:u.name
       });
     } else if (msg.AL !== old?.AL && msg.AL > 0) {
-      var ll = msg.name.startsWith("MR")?"1":"2";
+      console.log("Logistique");
+      var ll = getChainType(msg.name);
       var u = await getUser("4", msg.AL,msg.post,ll);
       
       if (!u) return
@@ -253,16 +282,36 @@ async function getInfo(msg,old) {
         type: "Logistique",
         ligne: msg.name,
         tel: u.tel,
+        name:u.name
       });
     } else if (msg.AQ !== old?.AQ && msg.AQ > 0) {
-      var ll = msg.name.startsWith("MR")?"1":"2";
+      console.log("Qualite");
+      var ll = getChainType(msg.name);
       var u = await getUser("1", msg.AQ,msg.post,ll);
       if (!u) return
       call({
         type: "Qualite",
         ligne: msg.name,
         tel: u.tel,
+        name:u.name
       });
+    }else if (msg.APU !== old?.APU && msg.APU > 0) {
+      // Prüftechnik
+      console.log("Prüftechnik");
+      var ll = getChainType(msg.name);
+      // console.log(msg.APU);
+      // console.log(msg.post);
+      // console.log(ll);
+      var u = await getUser("5", msg.APU,msg.post,ll);
+      if (!u) return
+      call({
+        type: "Prüftechnik",
+        ligne: msg.name,
+        tel: u.tel,
+        name:u.name
+      });
+    }else{
+      console.log("noo");
     }
   } catch (err) {
     console.log(err);
@@ -285,7 +334,7 @@ client.on('connect', () => {
   console.log('Connected')
   client.subscribe(["/safta/c2i/mqtt", "/safta/c2i/mqtt/data"], () => {
     // fun();
-    console.log(`Subscribe to topic /safta/c2i/mqtt and subscribe to "/safta/c2i/mqtt/data"`)
+    console.log(`Subscribe to topic /safta/c2i/mqtt2 and subscribe to "/safta/c2i/mqtt/data2"`)
   })
   // client.publish(topic, 'safta mqtt test', { qos: 0, retain: false }, (error) => {
   //   if (error) {
@@ -296,7 +345,7 @@ client.on('connect', () => {
 
 client.on('message', async (topic, payload) => {
   if (topic === "/safta/c2i/mqtt/data") {
-    console.log("msg received data");
+    console.log("msg received data2");
     try {
       const andons = await Andon.find().select('data -_id');
       client.publish("/safta/c2i/mqtt/all", JSON.stringify(andons), { qos: 2, retain: false }, (error) => {
@@ -309,13 +358,13 @@ client.on('message', async (topic, payload) => {
       console.log(err);
     }
   } else {
-    var b = JSON.parse(payload.toString());
     console.log("msg received mqtt");
+    var b = JSON.parse(payload.toString());
     try {
       const newUser = await Andon.findOne({ name: b.name });
       const an = {...newUser?._doc}
-      // console.log(an);
       if (b.rst === 0) {
+        console.log("not rst");
         if (newUser) {
           newUser.data = b;
           const savedUser = await newUser.save();
@@ -404,9 +453,9 @@ function getLocalIp() {
   }
 }
 
-getUser("1","1","A","1").then(function(response){
-  console.log(response);
-})
+// getUser("1","1","A","1").then(function(response){
+//   console.log(response);
+// })
 app.listen(process.env.PORT || 3000, function () {
   console.log(`server Started on ${getLocalIp()} port ${process.env.PORT || 3000} `);
 });
