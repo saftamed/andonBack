@@ -208,11 +208,12 @@ async function getUser(type, level,postt,lType) {
       if(h >= 8 && h <= 17){
         ssd = await User2.findOne({ level: level, post: type})
       }
-    }else{
-      if(h >= 8 && h <= 17){
-       ssd = await User2.findOne({ level: level, post: type,p:postt,lType: lType})
-      }
     }
+    // else{
+    //   if(h >= 8 && h <= 17){
+    //    ssd = await User2.findOne({ level: level, post: type,p:postt,lType: lType})
+    //   }
+    // }
 
    
   
@@ -243,19 +244,19 @@ function diff(msg,old){
   if(msg.AM !== old.AM && msg.AM > 0) return "AM"
 }
 function getChainType(name2){
-  return name2.startsWith("MR")?"1":name2.startsWith("VI")?"3":name2.startsWith("NA")?"4":"2";
+  return name2.startsWith("MR")?"1":name2.startsWith("VI")?"3":name2.startsWith("AR")?"4":"2";
 }
 async function getInfo(msg,old) {
   // console.log(msg.APU,old?.APU);
   // console.log("info");
   try {
     if (msg.AP !== old?.AP && msg.AP > 0 ) {
-      console.log("Production");
+      console.log("Prüftechnik");
       var ll = getChainType(msg.name);
       var u = await getUser("3", msg.AP,msg.post,ll);
       if (!u) return
       call({
-        type: "Production",
+        type: "Prüftechnik",
         ligne: msg.name,
         tel: u.tel,
         name:u.name
@@ -297,7 +298,7 @@ async function getInfo(msg,old) {
       });
     }else if (msg.APU !== old?.APU && msg.APU > 0) {
       // Prüftechnik
-      console.log("Prüftechnik");
+      console.log("Production");
       var ll = getChainType(msg.name);
       // console.log(msg.APU);
       // console.log(msg.post);
@@ -305,7 +306,7 @@ async function getInfo(msg,old) {
       var u = await getUser("5", msg.APU,msg.post,ll);
       if (!u) return
       call({
-        type: "Prüftechnik",
+        type: "Production",
         ligne: msg.name,
         tel: u.tel,
         name:u.name
